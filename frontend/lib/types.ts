@@ -1,0 +1,44 @@
+export type Lead = {
+  id: number;
+  business_name: string;
+  category: string | null;
+  address: string | null;
+  city?: string | null;
+  phone: string | null;
+  website: string | null;
+  google_rating: number | null;
+  review_count: number | null;
+  lead_score: number | null;
+  revenue_opportunity_monthly: number | null;
+  revenue_opportunity_desc: string | null;
+  status: string;
+  source: string;
+  ai_summary: string | null;
+  ai_pitch: string | null;
+  ai_biggest_problem: string | null;
+  ai_recommended_service: string | null;
+  ai_estimated_value: string | null;
+  call_script: string | null;
+  competitors: unknown[] | null;
+  competitive_gaps: string[] | null;
+  issues: { severity: string; title: string; description?: string; impact?: number }[] | null;
+  pagespeed_mobile: number | null;
+  pagespeed_desktop: number | null;
+  desktop_screenshot_path: string | null;
+  mobile_screenshot_path: string | null;
+  audio_briefing_path: string | null;
+  opportunity_score: number | null;
+  technical_debt_score: number | null;
+  urgency_score: number | null;
+  seo_score: number | null;
+  mobile_score: number | null;
+  content_score: number | null;
+  notes: string | null;
+};
+
+export type Stats = {
+  total_leads: number;
+  new_this_week: number;
+  total_monthly_opportunity: number;
+  avg_lead_score: number;
+};

@@ -1,0 +1,15 @@
+# Optional: Render Blueprint — set repo root to lead-bot/backend or adjust paths.
+services:
+  - type: web
+    name: lead-engine-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/ping
+    envVars:
+      - key: GEOAPIFY_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DATABASE_URL
+        sync: false

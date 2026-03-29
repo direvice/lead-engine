@@ -1,0 +1,21 @@
+# Python
+backend/.venv/
+backend/**/__pycache__/
+*.py[cod]
+backend/.env
+backend/*.db
+backend/*.db-journal
+backend/screenshots/
+backend/audio/
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/.env*.local
+frontend/.env.vercel*
+frontend/.vercel/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/

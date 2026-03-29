@@ -1,0 +1,214 @@
+"use client";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { AudioPlayer } from "@/components/AudioPlayer";
+import { CallScript } from "@/components/CallScript";
+import { CompetitorCard } from "@/components/CompetitorCard";
+import { IssueList } from "@/components/IssueList";
+import { RevenueCallout } from "@/components/RevenueCallout";
+import { ScoreRing } from "@/components/ScoreRing";
+import { getLead, patchLead } from "@/lib/api";
+import { staticFileUrl } from "@/lib/assets";
+import type { Lead } from "@/lib/types";
+
+export default function LeadDetailPage() {
+  const params = useParams();
+  const id = Number(params.id);
+  const [lead, setLead] = useState<Lead | null>(null);
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!id) return;
+    getLead(id).then((L) => {
+      setLead(L);
+      setNotes(L.notes || "");
+    });
+  }, [id]);
+
+  if (!lead) {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4">
+        <div className="h-8 w-8 animate-pulse rounded-full bg-accent/20" />
+        <p className="text-[13px] text-zinc-500">Loading dossier…</p>
+        <Link href="/" className="text-[12px] text-zinc-600 hover:text-accent">
+          ← Command
+        </Link>
+      </div>
+    );
+  }
+
+  const comps = (lead.competitors || []) as {
+    name?: string;
+    rating?: number;
+    review_count?: number;
+  }[];
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <Link href="/" className="text-[12px] text-zinc-600 transition hover:text-accent">
+          ← Command
+        </Link>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-600">Dossier</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            {lead.business_name}
+          </h1>
+          <p className="mt-2 text-[14px] text-zinc-500">
+            <span className="text-zinc-400">{lead.category}</span>
+            {lead.address ? <span className="text-zinc-700"> · </span> : null}
+            {lead.address}
+          </p>
+          {lead.phone ? (
+            <a
+              href={`tel:${lead.phone}`}
+              className="mt-3 inline-block text-xl font-medium tracking-tight text-accent hover:text-[#f0ff6a]"
+            >
+              {lead.phone}
+            </a>
+          ) : null}
+        </motion.div>
+      </div>
+
+      <div className="grid gap-10 lg:grid-cols-[1.55fr_1fr]">
+        <div className="space-y-10">
+          <RevenueCallout
+            amount={lead.revenue_opportunity_monthly || 0}
+            subtitle={lead.revenue_opportunity_desc}
+          />
+
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-600">Scores</p>
+            <div className="mt-4 flex flex-wrap gap-6">
+              <ScoreRing label="Opportunity" value={lead.opportunity_score ?? 0} />
+              <ScoreRing label="Tech debt" value={lead.technical_debt_score ?? 0} />
+              <ScoreRing label="Urgency" value={lead.urgency_score ?? 0} />
+              <ScoreRing label="SEO" value={lead.seo_score ?? 0} />
+              <ScoreRing label="Mobile" value={lead.mobile_score ?? 0} />
+            </div>
+            <p className="mt-4 text-[12px] text-zinc-600">
+              PageSpeed mobile {lead.pagespeed_mobile ?? "—"} · desktop {lead.pagespeed_desktop ?? "—"}
+            </p>
+          </div>
+
+          <section>
+            <h2 className="text-[13px] font-medium uppercase tracking-wider text-zinc-500">Issues</h2>
+            <div className="mt-4">
+              <IssueList issues={lead.issues} />
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-[13px] font-medium uppercase tracking-wider text-zinc-500">Competitors</h2>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {comps.slice(0, 3).map((c, i) => (
+                <CompetitorCard key={i} name={c.name || "—"} rating={c.rating} review_count={c.review_count} />
+              ))}
+            </div>
+            {lead.competitive_gaps?.length ? (
+              <ul className="mt-4 space-y-2 text-[13px] leading-relaxed text-zinc-500">
+                {lead.competitive_gaps.map((g, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="text-accent/80">·</span>
+                    {g}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+
+          <section>
+            <h2 className="text-[13px] font-medium uppercase tracking-wider text-zinc-500">Capture</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              {lead.desktop_screenshot_path ? (
+                <img
+                  src={staticFileUrl(lead.desktop_screenshot_path, "screenshots") || ""}
+                  alt="Desktop"
+                  className="rounded-2xl border border-white/[0.06] bg-black/20"
+                />
+              ) : null}
+              {lead.mobile_screenshot_path ? (
+                <img
+                  src={staticFileUrl(lead.mobile_screenshot_path, "screenshots") || ""}
+                  alt="Mobile"
+                  className="rounded-2xl border border-white/[0.06] bg-black/20"
+                />
+              ) : null}
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <div className="rounded-2xl border border-white/[0.06] bg-card/70 p-5 backdrop-blur-sm">
+            <h3 className="text-[11px] font-medium uppercase tracking-[0.2em] text-accent">Intelligence</h3>
+            <p className="mt-3 text-[14px] leading-relaxed text-zinc-400">{lead.ai_summary}</p>
+            <p className="mt-5 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Pitch</p>
+            <p className="mt-2 text-[14px] font-medium leading-relaxed text-white">{lead.ai_pitch}</p>
+            <div className="mt-4 space-y-1 text-[12px] text-zinc-600">
+              <p>Service · {lead.ai_recommended_service}</p>
+              <p>Estimate · {lead.ai_estimated_value}</p>
+            </div>
+            <button
+              type="button"
+              className="mt-4 text-[13px] font-medium text-accent hover:text-[#f0ff6a]"
+              onClick={() => navigator.clipboard.writeText(lead.ai_pitch || "")}
+            >
+              Copy pitch
+            </button>
+          </div>
+
+          <CallScript script={lead.call_script} />
+
+          <AudioPlayer src={staticFileUrl(lead.audio_briefing_path, "audio") || ""} />
+
+          <div className="rounded-2xl border border-white/[0.06] bg-card/70 p-5 backdrop-blur-sm">
+            <h3 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">Pipeline</h3>
+            <select
+              className="input-intel mt-3"
+              value={lead.status}
+              onChange={(e) => patchLead(lead.id, { status: e.target.value }).then(setLead)}
+            >
+              {["new", "contacted", "interested", "won", "skip"].map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="input-intel mt-3 min-h-[100px] resize-y font-mono text-[12px] leading-relaxed"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={() => patchLead(lead.id, { notes }).then(setLead)}
+              placeholder="Notes — autosave on blur"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {lead.phone ? (
+              <button
+                type="button"
+                className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[13px] text-zinc-300 transition hover:border-white/[0.12] hover:text-white"
+                onClick={() => navigator.clipboard.writeText(lead.phone || "")}
+              >
+                Copy phone
+              </button>
+            ) : null}
+            {lead.website ? (
+              <a
+                href={lead.website}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[13px] text-zinc-300 transition hover:border-accent/30 hover:text-accent"
+              >
+                Website
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -43,9 +43,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Lead Engine API", lifespan=lifespan)
+# Explicit origins from CORS_ORIGINS + regex so any Vercel deployment URL works (CLI previews use unique *.vercel.app hosts).
+_VERCEL_REGEX = r"^https://[a-zA-Z0-9\-.]+\.vercel\.app$"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=parse_cors_origins(settings.cors_origins),
+    allow_origin_regex=_VERCEL_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

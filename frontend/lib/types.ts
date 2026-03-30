@@ -1,3 +1,34 @@
+export type SmbFit = {
+  target_tier?: string;
+  chain_likelihood?: number;
+  simplicity_score?: number;
+  fixability_score?: number;
+  smb_fit_index?: number;
+  reasons?: string[];
+};
+
+export type AiEasyWin = {
+  fix?: string;
+  why_it_matters?: string;
+  effort?: string;
+  how_you_fix_it?: string;
+};
+
+export type AiSmbIntel = {
+  easy_wins?: AiEasyWin[];
+  chain_verdict?: string;
+  ideal_client_for_solo_dev?: boolean;
+  tech_simplicity_note?: string;
+  what_not_to_sell?: string;
+};
+
+export type LeadFeatures = {
+  smb_fit?: SmbFit;
+  ai_smb_intel?: AiSmbIntel;
+  builder?: string;
+  [key: string]: unknown;
+};
+
 export type Lead = {
   id: number;
   business_name: string;
@@ -34,6 +65,7 @@ export type Lead = {
   mobile_score: number | null;
   content_score: number | null;
   notes: string | null;
+  features?: LeadFeatures | null;
 };
 
 export type Stats = {

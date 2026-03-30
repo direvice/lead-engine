@@ -32,10 +32,20 @@ export function LeadCard({ lead }: { lead: Lead }) {
         >
           {lead.business_name}
         </Link>
-        <p className="mt-1 text-[13px] text-zinc-500">
+        <p className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-zinc-500">
           <span className="text-zinc-400">{lead.category || "Business"}</span>
-          {loc ? <span className="text-zinc-700"> · </span> : null}
+          {loc ? <span className="text-zinc-700">·</span> : null}
           {loc || ""}
+          {lead.features?.smb_fit?.target_tier === "ideal_smb" ? (
+            <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-300/90">
+              SMB
+            </span>
+          ) : null}
+          {lead.features?.smb_fit?.target_tier === "likely_chain" ? (
+            <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-rose-300/90">
+              Chain?
+            </span>
+          ) : null}
         </p>
         <p className="mt-3 line-clamp-2 text-[13px] leading-relaxed text-zinc-500">
           {lead.ai_biggest_problem || lead.revenue_opportunity_desc || "Awaiting analysis."}

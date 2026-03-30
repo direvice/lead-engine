@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, NavigableString
 
@@ -31,10 +32,32 @@ def detect_builder(html: str) -> str | None:
     return None
 
 
-def extract_text_and_features(html: str) -> dict[str, Any]:
+def extract_text_and_features(html: str, page_url: str | None = None) -> dict[str, Any]:
     soup = BeautifulSoup(html, "lxml")
     raw_text = soup.get_text(" ", strip=True).lower()
     low_html = html.lower()
+
+    base_host = ""
+    if page_url:
+        try:
+            base_host = (urlparse(page_url).hostname or "").lower()
+        except Exception:
+            base_host = ""
+
+    scripts = soup.find_all("script", src=True)
+    external_script_count = len(scripts)
+    viewport = soup.find("meta", attrs={"name": re.compile(r"^viewport$", re.I)})
+    has_viewport_meta = viewport is not None
+
+    internal_link_count = 0
+    for a in soup.find_all("a", href=True):
+        href = (a.get("href") or "").strip()
+        if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+            continue
+        if href.startswith("/") or (base_host and base_host in href.lower()):
+            internal_link_count += 1
+
+    html_char_count = len(html)
 
     # Duplicate text nodes > 40 chars, count >= 3
     text_chunks: list[str] = []
@@ -134,6 +157,10 @@ def extract_text_and_features(html: str) -> dict[str, Any]:
         "has_blog": has_blog,
         "duplicate_text_bug": duplicate_text_bug,
         "text_sample": raw_text[:4000],
+        "html_char_count": html_char_count,
+        "external_script_count": external_script_count,
+        "has_viewport_meta": has_viewport_meta,
+        "internal_link_count": internal_link_count,
     }
 
 

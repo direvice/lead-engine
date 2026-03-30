@@ -15,6 +15,7 @@ from analysis.competitors import find_competitors
 from analysis.issues import build_issues
 from analysis.revenue import compute_revenue_opportunity
 from analysis.scorer import compute_scores
+from analysis.smb_fit import assess_smb_fit
 from config import get_settings
 from discovery.facebook import search_facebook_pages
 from discovery.geoapify_places import discover_geoapify_places
@@ -158,7 +159,7 @@ async def analyze_lead_row(
                 lead.scrape_error = data.load_error or "robots"
             html = data.html or ""
             if html:
-                features = extract_text_and_features(html)
+                features = extract_text_and_features(html, website)
                 features["has_horizontal_scroll"] = data.has_horizontal_scroll
                 ps_m = await run_pagespeed(website, settings.google_places_api_key, "mobile")
                 ps_d = await run_pagespeed(website, settings.google_places_api_key, "desktop")
@@ -183,6 +184,17 @@ async def analyze_lead_row(
     if years:
         site_age_years = max(0, datetime.utcnow().year - min(years))
 
+    smb_fit = assess_smb_fit(
+        lead.business_name,
+        html,
+        {},
+        features,
+        pagespeed,
+        scraped_meta,
+        lead.review_count,
+    )
+    features["smb_fit"] = smb_fit
+
     lead.website_builder = features.get("builder")
     lead.features = features
 
@@ -192,6 +204,17 @@ async def analyze_lead_row(
         scraped_meta,
         lead.category,
     )
+    if smb_fit.get("target_tier") == "likely_chain":
+        issues = [
+            {
+                "severity": "low",
+                "code": "likely_chain",
+                "title": "Likely chain / national brand",
+                "description": "Automated signals suggest this is not an ideal solo-dev client. Verify before outreach; lead score is reduced.",
+                "impact": 0,
+            },
+            *issues,
+        ]
     lead.issues = issues
     lead.critical_issues = critical
     lead.missing_features = missing
@@ -241,6 +264,7 @@ async def analyze_lead_row(
         site_age_years=site_age_years,
         has_errors=bool(scraped_meta.get("page_errors")),
         is_new_business=(lead.review_count or 0) < 50,
+        smb_fit=smb_fit,
     )
     lead.opportunity_score = int(scores["opportunity_score"])
     lead.technical_debt_score = int(scores["technical_debt_score"])
@@ -257,6 +281,8 @@ async def analyze_lead_row(
         pass
     lead.last_screenshoted = datetime.utcnow()
 
+    smb_signals = str(smb_fit)[:2200]
+
     prompt = ANALYSIS_PROMPT.format(
         name=lead.business_name,
         category=lead.category or "",
@@ -267,6 +293,7 @@ async def analyze_lead_row(
         critical_issues=", ".join(critical[:6]) or "none listed",
         missing_features=", ".join(missing) or "none listed",
         opportunity_calc=rev,
+        smb_signals=smb_signals,
     )
 
     try:
@@ -279,6 +306,14 @@ async def analyze_lead_row(
         lead.ai_estimated_value = data.get("estimated_value")
         lead.ai_revenue_opportunity = data.get("revenue_opportunity")
         lead.ai_urgency_reason = data.get("urgency_reason")
+        features["ai_smb_intel"] = {
+            "easy_wins": data.get("easy_wins") or [],
+            "chain_verdict": data.get("chain_verdict"),
+            "ideal_client_for_solo_dev": data.get("ideal_client_for_solo_dev"),
+            "tech_simplicity_note": data.get("tech_simplicity_note"),
+            "what_not_to_sell": data.get("what_not_to_sell"),
+        }
+        lead.features = features
     except Exception as e:
         logger.warning("AI analysis failed: %s", e)
         lead.ai_model_used = "none"

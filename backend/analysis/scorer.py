@@ -42,6 +42,7 @@ def compute_scores(
     site_age_years: float | None,
     has_errors: bool,
     is_new_business: bool,
+    smb_fit: dict[str, Any] | None = None,
 ) -> dict[str, float]:
     opportunity = 0.0
 
@@ -113,6 +114,20 @@ def compute_scores(
         + urgency * 0.20
         + rating_bonus * 0.15
     )
+
+    # SMB targeting: deprioritize national chains; lift simple, fixable local sites.
+    sf = smb_fit or {}
+    tier = sf.get("target_tier") or "ideal_smb"
+    smb_idx = float(sf.get("smb_fit_index") or 50)
+    if tier == "likely_chain":
+        final *= 0.22
+        opportunity = min(opportunity, 22.0)
+    elif tier == "borderline":
+        final *= 0.72
+    elif tier == "ideal_smb" and smb_idx >= 62:
+        final = min(100.0, final * 1.14)
+        opportunity = min(100.0, opportunity + 10.0)
+
     final = min(100.0, max(0.0, final))
 
     # Sub-scores for UI rings (derived)

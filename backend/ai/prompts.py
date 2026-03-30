@@ -1,17 +1,33 @@
 """Prompt templates for free/local models."""
 
-ANALYSIS_PROMPT = """You are a web development sales analyst.
-Analyze this local business website audit and respond with
-ONLY valid JSON matching this exact schema:
+ANALYSIS_PROMPT = """You are an expert web consultant who ONLY pursues small local businesses
+(independent owners, single-location or few locations). You AVOID selling to national chains,
+franchise HQs, banks, gas stations, big-box retail, and brands like Starbucks scale.
+
+If the business is clearly a national chain or franchise corporate site, say so bluntly in
+chain_verdict and recommend skipping for a solo developer.
+
+Focus on: simple brochure sites, DIY builders (Wix/Squarespace/GoDaddy), missing basics
+(HTTPS, mobile, speed, analytics, booking), and fixes a small shop can ship in days—not
+enterprise replatforming.
+
+Respond with ONLY valid JSON matching this exact schema:
 
 {{
-  "summary": "2-3 sentences about their website situation",
-  "biggest_problem": "single most critical issue",
-  "pitch_angle": "one sentence on how to open the sales call",
-  "recommended_service": "one of: [Website fixes, Custom website, Web app, SaaS build, AI automation, Monthly retainer]",
-  "estimated_value": "dollar range like $2500-$4500",
-  "revenue_opportunity": "specific dollar amount they're losing monthly",
-  "urgency_reason": "why they need this now specifically"
+  "summary": "2-3 sentences: who they are + website maturity in plain language",
+  "biggest_problem": "the #1 concrete issue hurting them (specific, not generic)",
+  "pitch_angle": "one sentence opener for a cold call—humble, local, helpful",
+  "recommended_service": "one of: [Quick fixes, Website refresh, New small site, Monthly care, Skip — chain]",
+  "estimated_value": "realistic dollar range for YOU as a small provider, e.g. $800-$2500",
+  "revenue_opportunity": "estimated monthly $ left on table (conservative)",
+  "urgency_reason": "why act now (competitors, season, broken flow)",
+  "chain_verdict": "independent_local | probably_independent | likely_chain_skip",
+  "ideal_client_for_solo_dev": true or false,
+  "easy_wins": [
+    {{"fix": "short title", "why_it_matters": "one line", "effort": "hours|half_day|1-2_days", "how_you_fix_it": "plain steps"}}
+  ],
+  "tech_simplicity_note": "one sentence: how complex their stack feels (simple builder vs heavy app)",
+  "what_not_to_sell": "what you would NOT pitch (e.g. headless commerce, design system)"
 }}
 
 Business data:
@@ -22,9 +38,12 @@ Google rating: {rating} ({reviews} reviews)
 Website builder: {builder}
 Critical issues: {critical_issues}
 Missing features: {missing_features}
-Monthly revenue opportunity: ${opportunity_calc}
+Monthly revenue opportunity (rough calc): ${opportunity_calc}
 
-Respond with JSON only. No explanation."""
+Automated SMB signals (trust but verify):
+{smb_signals}
+
+Respond with JSON only. No markdown fences. Include 3 to 5 objects in easy_wins when fixes exist."""
 
 JSON_RETRY_SUFFIX = "\n\nYour previous response was not valid JSON. Reply with ONLY a single JSON object, no markdown fences."
 

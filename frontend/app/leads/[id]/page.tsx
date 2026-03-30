@@ -94,6 +94,104 @@ export default function LeadDetailPage() {
             </p>
           </div>
 
+          {lead.features?.smb_fit ? (
+            <section>
+              <h2 className="text-[13px] font-medium uppercase tracking-wider text-zinc-500">
+                SMB fit (automated)
+              </h2>
+              <div className="mt-4 rounded-2xl border border-white/[0.06] bg-card/50 p-4">
+                <div className="flex flex-wrap gap-2 text-[12px]">
+                  <span
+                    className={
+                      lead.features.smb_fit.target_tier === "ideal_smb"
+                        ? "rounded-full bg-emerald-500/15 px-2.5 py-1 font-medium text-emerald-200 ring-1 ring-emerald-500/25"
+                        : lead.features.smb_fit.target_tier === "likely_chain"
+                          ? "rounded-full bg-rose-500/15 px-2.5 py-1 font-medium text-rose-200 ring-1 ring-rose-500/25"
+                          : "rounded-full bg-amber-500/15 px-2.5 py-1 font-medium text-amber-200 ring-1 ring-amber-500/25"
+                    }
+                  >
+                    {lead.features.smb_fit.target_tier === "ideal_smb"
+                      ? "Ideal local target"
+                      : lead.features.smb_fit.target_tier === "likely_chain"
+                        ? "Likely chain — skip?"
+                        : "Borderline"}
+                  </span>
+                  <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-zinc-400">
+                    Fit index · {lead.features.smb_fit.smb_fit_index ?? "—"}
+                  </span>
+                  <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-zinc-400">
+                    Simplicity · {lead.features.smb_fit.simplicity_score ?? "—"}
+                  </span>
+                  <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-zinc-400">
+                    Fixability · {lead.features.smb_fit.fixability_score ?? "—"}
+                  </span>
+                </div>
+                {lead.features.smb_fit.reasons?.length ? (
+                  <ul className="mt-4 space-y-1.5 text-[13px] leading-relaxed text-zinc-500">
+                    {lead.features.smb_fit.reasons.map((r, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="text-accent/70">·</span>
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
+          {lead.features?.ai_smb_intel ? (
+            <section>
+              <h2 className="text-[13px] font-medium uppercase tracking-wider text-zinc-500">
+                Easy wins & positioning
+              </h2>
+              <div className="mt-4 space-y-4">
+                {lead.features.ai_smb_intel.tech_simplicity_note ? (
+                  <p className="text-[13px] leading-relaxed text-zinc-500">
+                    <span className="font-medium text-zinc-400">Stack: </span>
+                    {lead.features.ai_smb_intel.tech_simplicity_note}
+                  </p>
+                ) : null}
+                {lead.features.ai_smb_intel.chain_verdict ? (
+                  <p className="text-[13px] text-zinc-500">
+                    <span className="font-medium text-zinc-400">Chain check: </span>
+                    {lead.features.ai_smb_intel.chain_verdict.replace(/_/g, " ")}
+                    {lead.features.ai_smb_intel.ideal_client_for_solo_dev === false ? (
+                      <span className="ml-2 text-rose-300/90">· Not ideal for solo dev</span>
+                    ) : null}
+                  </p>
+                ) : null}
+                {lead.features.ai_smb_intel.what_not_to_sell ? (
+                  <p className="text-[13px] leading-relaxed text-zinc-500">
+                    <span className="font-medium text-zinc-400">Don&apos;t pitch: </span>
+                    {lead.features.ai_smb_intel.what_not_to_sell}
+                  </p>
+                ) : null}
+                {lead.features.ai_smb_intel.easy_wins?.length ? (
+                  <ul className="space-y-4">
+                    {lead.features.ai_smb_intel.easy_wins.map((w, i) => (
+                      <li
+                        key={i}
+                        className="rounded-xl border border-white/[0.06] bg-black/20 px-4 py-3 text-[13px] leading-relaxed text-zinc-400"
+                      >
+                        <p className="font-medium text-white">{w.fix || "Fix"}</p>
+                        {w.why_it_matters ? (
+                          <p className="mt-1 text-zinc-500">{w.why_it_matters}</p>
+                        ) : null}
+                        <p className="mt-2 text-[12px] text-zinc-600">
+                          {w.effort ? <span className="text-accent/80">Effort · {w.effort}</span> : null}
+                          {w.how_you_fix_it ? (
+                            <span className="mt-1 block text-zinc-500">{w.how_you_fix_it}</span>
+                          ) : null}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
           <section>
             <h2 className="text-[13px] font-medium uppercase tracking-wider text-zinc-500">Issues</h2>
             <div className="mt-4">

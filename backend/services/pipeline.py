@@ -270,10 +270,10 @@ async def analyze_lead_row(
     lead.opportunity_score = int(scores["opportunity_score"])
     lead.technical_debt_score = int(scores["technical_debt_score"])
     lead.urgency_score = int(scores["urgency_score"])
-    lead.lead_score = scores["lead_score"]
-    lead.lead_score = apply_pattern_multiplier(
-        db, float(lead.lead_score or 0), smb_fit, lead.website_builder
-    )
+    raw_lead_score = float(scores["lead_score"])
+    features["_score_pre_learning"] = raw_lead_score
+    lead.lead_score = apply_pattern_multiplier(db, raw_lead_score, smb_fit, lead.website_builder)
+    lead.features = features
     lead.seo_score = int(scores["seo_score"])
     lead.mobile_score = int(scores["mobile_score"])
     lead.content_score = int(scores["content_score"])

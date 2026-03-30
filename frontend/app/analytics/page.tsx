@@ -15,7 +15,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { analyticsSummary, getIntelligenceBrief, getLeads, type IntelligenceBrief } from "@/lib/api";
+import {
+  analyticsSummary,
+  getIntelligenceBrief,
+  getLeads,
+  recalculateLearnedScores,
+  type IntelligenceBrief,
+} from "@/lib/api";
 
 const COLORS = ["#e8ff47", "#c4d93a", "#9ca3af", "#52525b", "#3f3f46", "#27272a"];
 
@@ -23,6 +29,7 @@ export default function AnalyticsPage() {
   const [funnel, setFunnel] = useState<Record<string, number>>({});
   const [cats, setCats] = useState<{ name: string; value: number }[]>([]);
   const [brief, setBrief] = useState<IntelligenceBrief | null>(null);
+  const [recalcMsg, setRecalcMsg] = useState<string | null>(null);
 
   useEffect(() => {
     analyticsSummary().then((r) => setFunnel(r.funnel));
@@ -78,6 +85,23 @@ export default function AnalyticsPage() {
               ))}
             </ul>
           ) : null}
+          <button
+            type="button"
+            className="mt-4 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-[12px] font-medium text-zinc-300 transition hover:border-accent/30 hover:text-white"
+            onClick={() =>
+              recalculateLearnedScores()
+                .then((r) => {
+                  setRecalcMsg(
+                    `Updated ${r.scores_recalculated} scores · skipped ${r.skipped_no_baseline} (no baseline)`
+                  );
+                  getIntelligenceBrief().then(setBrief);
+                })
+                .catch(() => setRecalcMsg("Recalc failed — check API"))
+            }
+          >
+            Re-apply learning to all scores
+          </button>
+          {recalcMsg ? <p className="mt-2 text-[11px] text-zinc-600">{recalcMsg}</p> : null}
         </motion.div>
       ) : null}
 

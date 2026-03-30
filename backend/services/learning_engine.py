@@ -146,3 +146,28 @@ def _generate_hint(top: list[dict[str, Any]], total: int) -> str:
         f"{total} teaching updates recorded. Keep labeling — "
         "the engine boosts scores for profiles you confirm and dampens ones you reject."
     )
+
+
+def recalculate_all_scores(db: Session) -> dict[str, Any]:
+    """
+    Re-apply learning multipliers using stored _score_pre_learning from last full analysis.
+    Leads analyzed before that field existed are skipped.
+    """
+    updated = 0
+    skipped = 0
+    for lead in db.query(BusinessLead).all():
+        feats = lead.features if isinstance(lead.features, dict) else {}
+        pre = feats.get("_score_pre_learning")
+        if pre is None:
+            skipped += 1
+            continue
+        smb = feats.get("smb_fit") or {}
+        new_s = apply_pattern_multiplier(db, float(pre), smb, lead.website_builder)
+        lead.lead_score = new_s
+        updated += 1
+    db.commit()
+    return {
+        "scores_recalculated": updated,
+        "skipped_no_baseline": skipped,
+        "hint": "Re-run a scan or rescore job on old leads to populate score baselines.",
+    }

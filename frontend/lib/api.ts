@@ -14,10 +14,15 @@ export function getStats() {
   return fetchJson<import("./types").Stats>("/api/stats");
 }
 
-export function getLeads(params: Record<string, string | number | undefined>) {
+export function getLeads(params: Record<string, string | number | boolean | undefined>) {
   const q = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== "") q.set(k, String(v));
+    if (v === undefined || v === "") return;
+    if (typeof v === "boolean") {
+      if (v) q.set(k, "true");
+      return;
+    }
+    q.set(k, String(v));
   });
   return fetchJson<{ items: import("./types").Lead[]; count: number }>(`/api/leads?${q}`);
 }
@@ -85,4 +90,21 @@ export type IntelligenceBrief = {
 
 export function getIntelligenceBrief() {
   return fetchJson<IntelligenceBrief>("/api/intelligence/brief");
+}
+
+export function recalculateLearnedScores() {
+  return fetchJson<{
+    scores_recalculated: number;
+    skipped_no_baseline: number;
+    hint: string;
+  }>("/api/intelligence/recalculate-scores", { method: "POST" });
+}
+
+/** Build CSV export URL (open in new tab / download). */
+export function leadsExportCsvUrl(opts: { minScore?: number; excludeLikelyChain?: boolean }) {
+  const q = new URLSearchParams();
+  if (opts.minScore != null && opts.minScore > 0) q.set("min_score", String(opts.minScore));
+  if (opts.excludeLikelyChain) q.set("exclude_likely_chain", "true");
+  const qs = q.toString();
+  return apiUrl(`/api/leads/export.csv${qs ? `?${qs}` : ""}`);
 }

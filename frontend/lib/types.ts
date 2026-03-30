@@ -55,6 +55,7 @@ export type Lead = {
   issues: { severity: string; title: string; description?: string; impact?: number }[] | null;
   pagespeed_mobile: number | null;
   pagespeed_desktop: number | null;
+  pagespeed_opportunities?: { id?: string; title?: string; description?: string }[] | null;
   desktop_screenshot_path: string | null;
   mobile_screenshot_path: string | null;
   audio_briefing_path: string | null;

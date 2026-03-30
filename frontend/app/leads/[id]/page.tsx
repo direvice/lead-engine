@@ -200,6 +200,30 @@ export default function LeadDetailPage() {
             </div>
           </section>
 
+          {lead.pagespeed_opportunities && lead.pagespeed_opportunities.length > 0 ? (
+            <section>
+              <h2 className="text-[13px] font-medium uppercase tracking-wider text-zinc-500">
+                PageSpeed opportunities
+              </h2>
+              <p className="mt-2 text-[12px] text-zinc-600">
+                Actionable Lighthouse hints (often quick wins: images, fonts, unused JS).
+              </p>
+              <ul className="mt-4 space-y-3">
+                {lead.pagespeed_opportunities.map((o) => (
+                  <li
+                    key={o.id || o.title}
+                    className="rounded-xl border border-white/[0.06] bg-black/15 px-4 py-3 text-[13px] leading-relaxed text-zinc-400"
+                  >
+                    <p className="font-medium text-zinc-200">{o.title}</p>
+                    {o.description ? (
+                      <p className="mt-1 text-[12px] text-zinc-500">{o.description}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <section>
             <h2 className="text-[13px] font-medium uppercase tracking-wider text-zinc-500">Competitors</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">

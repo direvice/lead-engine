@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -19,7 +21,11 @@ from sqlalchemy.orm import Session
 from config import get_settings, parse_cors_origins
 from database import get_db, init_db
 from models import BusinessLead, ScanJob
-from services.learning_engine import intelligence_brief, record_teaching_signal
+from services.learning_engine import (
+    intelligence_brief,
+    recalculate_all_scores,
+    record_teaching_signal,
+)
 from services.scan_job import ScanRequest, active_scan_message, get_ai_router, run_scan_job
 
 logging.basicConfig(level=logging.INFO)
@@ -135,6 +141,8 @@ def list_leads(
     category: Optional[str] = None,
     source: Optional[str] = None,
     sort: str = "lead_score",
+    smb_tier: Optional[str] = None,
+    exclude_likely_chain: bool = False,
     limit: int = Query(100, le=500),
     offset: int = 0,
 ):
@@ -155,16 +163,91 @@ def list_leads(
                 BusinessLead.source_ids.isnot(None),
             )
         )
+    tier_json = func.json_extract(BusinessLead.features, "$.smb_fit.target_tier")
+    if smb_tier:
+        query = query.filter(tier_json == smb_tier)
+    if exclude_likely_chain:
+        query = query.filter(
+            or_(
+                BusinessLead.features.is_(None),
+                func.coalesce(tier_json, "") != "likely_chain",
+            )
+        )
+    smb_idx_json = func.json_extract(BusinessLead.features, "$.smb_fit.smb_fit_index")
     if sort == "revenue":
         query = query.order_by(BusinessLead.revenue_opportunity_monthly.desc().nullslast())
     elif sort == "newest":
         query = query.order_by(BusinessLead.created_at.desc())
     elif sort == "name":
         query = query.order_by(BusinessLead.business_name)
+    elif sort == "smb_fit":
+        query = query.order_by(smb_idx_json.desc().nullslast())
     else:
         query = query.order_by(BusinessLead.lead_score.desc().nullslast())
     rows = query.offset(offset).limit(limit).all()
     return {"items": [_lead_to_dict(r) for r in rows], "count": len(rows)}
+
+
+@app.get("/api/leads/export.csv")
+def export_leads_csv(
+    db: Session = Depends(get_db),
+    min_score: float = 0,
+    exclude_likely_chain: bool = False,
+):
+    query = db.query(BusinessLead)
+    if min_score:
+        query = query.filter(BusinessLead.lead_score >= min_score)
+    tier_json = func.json_extract(BusinessLead.features, "$.smb_fit.target_tier")
+    if exclude_likely_chain:
+        query = query.filter(
+            or_(
+                BusinessLead.features.is_(None),
+                func.coalesce(tier_json, "") != "likely_chain",
+            )
+        )
+    rows = (
+        query.order_by(BusinessLead.lead_score.desc().nullslast()).limit(2500).all()
+    )
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(
+        [
+            "id",
+            "business_name",
+            "category",
+            "address",
+            "phone",
+            "website",
+            "lead_score",
+            "smb_tier",
+            "smb_fit_index",
+            "status",
+            "revenue_monthly",
+        ]
+    )
+    for r in rows:
+        feats = r.features if isinstance(r.features, dict) else {}
+        smb = feats.get("smb_fit") or {}
+        w.writerow(
+            [
+                r.id,
+                r.business_name,
+                r.category or "",
+                (r.address or "").replace("\n", " "),
+                r.phone or "",
+                r.website or "",
+                r.lead_score or 0,
+                smb.get("target_tier") or "",
+                smb.get("smb_fit_index") or "",
+                r.status,
+                r.revenue_opportunity_monthly or 0,
+            ]
+        )
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="lead-engine-export.csv"'},
+    )
 
 
 @app.get("/api/leads/{lead_id}")
@@ -216,6 +299,12 @@ def teach_lead(lead_id: int, body: TeachBody, db: Session = Depends(get_db)):
 @app.get("/api/intelligence/brief")
 def api_intelligence_brief(db: Session = Depends(get_db)):
     return intelligence_brief(db)
+
+
+@app.post("/api/intelligence/recalculate-scores")
+def api_recalculate_scores(db: Session = Depends(get_db)):
+    """Re-apply learning multipliers to all leads that have _score_pre_learning stored."""
+    return recalculate_all_scores(db)
 
 
 @app.get("/api/analytics/summary")

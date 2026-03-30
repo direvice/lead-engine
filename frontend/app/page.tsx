@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { LeadCard } from "@/components/LeadCard";
 import { getPublicApiBase } from "@/lib/api-base";
-import { getLeads, getStats } from "@/lib/api";
+import { getLeads, getStats, leadsExportCsvUrl } from "@/lib/api";
 import { useApiConnection } from "@/components/SystemStatus";
 import type { Lead, Stats } from "@/lib/types";
 
@@ -15,6 +15,9 @@ export default function DashboardPage() {
   const [q, setQ] = useState("");
   const [minScore, setMinScore] = useState(0);
   const [status, setStatus] = useState("");
+  const [sort, setSort] = useState<"lead_score" | "smb_fit" | "newest" | "revenue">("lead_score");
+  const [smbTier, setSmbTier] = useState("");
+  const [hideChains, setHideChains] = useState(true);
   const { connected } = useApiConnection();
 
   useEffect(() => {
@@ -26,12 +29,14 @@ export default function DashboardPage() {
       min_score: minScore,
       q: q || undefined,
       status: status || undefined,
-      sort: "lead_score",
+      sort,
+      smb_tier: smbTier || undefined,
+      exclude_likely_chain: hideChains || undefined,
       limit: 80,
     })
       .then((r) => setLeads(r.items))
       .catch(() => setLeads([]));
-  }, [q, minScore, status]);
+  }, [q, minScore, status, sort, smbTier, hideChains]);
 
   const hero = useMemo(() => {
     if (!stats) return null;
@@ -158,6 +163,58 @@ export default function DashboardPage() {
               <option value="skip">Skip</option>
             </select>
           </div>
+          <div className="w-full lg:w-44">
+            <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+              Sort
+            </label>
+            <select
+              className="input-intel mt-2"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as typeof sort)}
+            >
+              <option value="lead_score">Lead score</option>
+              <option value="smb_fit">SMB fit index</option>
+              <option value="revenue">Revenue</option>
+              <option value="newest">Newest</option>
+            </select>
+          </div>
+          <div className="w-full lg:w-44">
+            <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+              SMB tier
+            </label>
+            <select
+              className="input-intel mt-2"
+              value={smbTier}
+              onChange={(e) => setSmbTier(e.target.value)}
+            >
+              <option value="">Any</option>
+              <option value="ideal_smb">Ideal local</option>
+              <option value="borderline">Borderline</option>
+              <option value="likely_chain">Likely chain</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 text-[13px] text-zinc-500">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={hideChains}
+              onChange={(e) => setHideChains(e.target.checked)}
+              className="rounded border-zinc-600 bg-zinc-900 accent-accent"
+            />
+            Hide likely chains
+          </label>
+          {apiBase ? (
+            <a
+              href={leadsExportCsvUrl({ minScore, excludeLikelyChain: hideChains })}
+              className="text-accent hover:text-[#f0ff6a]"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Export CSV ↓
+            </a>
+          ) : null}
         </div>
 
         <div className="space-y-3 pt-2">

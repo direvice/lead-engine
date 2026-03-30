@@ -32,6 +32,12 @@ def get_db():
 
 
 def init_db():
-    from models import BusinessLead, ScanJob, SettingsRow, ZipScanState  # noqa: F401
+    from models import (  # noqa: F401
+        BusinessLead,
+        LearningSignal,
+        ScanJob,
+        SettingsRow,
+        ZipScanState,
+    )
 
     Base.metadata.create_all(bind=engine)

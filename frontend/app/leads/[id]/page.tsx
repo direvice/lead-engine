@@ -10,7 +10,7 @@ import { CompetitorCard } from "@/components/CompetitorCard";
 import { IssueList } from "@/components/IssueList";
 import { RevenueCallout } from "@/components/RevenueCallout";
 import { ScoreRing } from "@/components/ScoreRing";
-import { getLead, patchLead } from "@/lib/api";
+import { getLead, patchLead, teachLead } from "@/lib/api";
 import { staticFileUrl } from "@/lib/assets";
 import type { Lead } from "@/lib/types";
 
@@ -19,6 +19,7 @@ export default function LeadDetailPage() {
   const id = Number(params.id);
   const [lead, setLead] = useState<Lead | null>(null);
   const [notes, setNotes] = useState("");
+  const [teachMsg, setTeachMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -240,6 +241,44 @@ export default function LeadDetailPage() {
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <div className="rounded-2xl border border-white/[0.06] bg-card/70 p-5 backdrop-blur-sm">
+            <h3 className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">Teach the model</h3>
+            <p className="mt-2 text-[12px] leading-relaxed text-zinc-600">
+              Your labels tune ranking for similar businesses (pattern = SMB tier + site builder).
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-lg bg-emerald-500/15 px-3 py-1.5 text-[12px] font-medium text-emerald-200 ring-1 ring-emerald-500/25 transition hover:bg-emerald-500/25"
+                onClick={() =>
+                  teachLead(lead.id, "good_target")
+                    .then(() => {
+                      setTeachMsg("Saved · good target for your practice");
+                      setTimeout(() => setTeachMsg(null), 3200);
+                    })
+                    .catch(() => setTeachMsg("Could not save — check API"))
+                }
+              >
+                👍 Good target
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-rose-500/15 px-3 py-1.5 text-[12px] font-medium text-rose-200 ring-1 ring-rose-500/25 transition hover:bg-rose-500/25"
+                onClick={() =>
+                  teachLead(lead.id, "bad_target")
+                    .then(() => {
+                      setTeachMsg("Saved · will dampen similar profiles");
+                      setTimeout(() => setTeachMsg(null), 3200);
+                    })
+                    .catch(() => setTeachMsg("Could not save — check API"))
+                }
+              >
+                👎 Bad fit
+              </button>
+            </div>
+            {teachMsg ? <p className="mt-2 text-[11px] text-zinc-500">{teachMsg}</p> : null}
+          </div>
+
           <div className="rounded-2xl border border-white/[0.06] bg-card/70 p-5 backdrop-blur-sm">
             <h3 className="text-[11px] font-medium uppercase tracking-[0.2em] text-accent">Intelligence</h3>
             <p className="mt-3 text-[14px] leading-relaxed text-zinc-400">{lead.ai_summary}</p>

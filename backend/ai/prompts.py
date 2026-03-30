@@ -43,6 +43,8 @@ Monthly revenue opportunity (rough calc): ${opportunity_calc}
 Automated SMB signals (trust but verify):
 {smb_signals}
 
+The human operator may later label this lead as a good or bad fit; keep advice honest so those labels stay trustworthy.
+
 Respond with JSON only. No markdown fences. Include 3 to 5 objects in easy_wins when fixes exist."""
 
 JSON_RETRY_SUFFIX = "\n\nYour previous response was not valid JSON. Reply with ONLY a single JSON object, no markdown fences."

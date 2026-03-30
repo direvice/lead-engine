@@ -62,3 +62,27 @@ export function botStatus() {
 export function analyticsSummary() {
   return fetchJson<{ funnel: Record<string, number> }>("/api/analytics/summary");
 }
+
+export function teachLead(id: number, signal: "good_target" | "bad_target") {
+  return fetchJson<{ ok: boolean; pattern?: string; bucket?: { good: number; bad: number } }>(
+    `/api/leads/${id}/teach`,
+    { method: "POST", body: JSON.stringify({ signal }) }
+  );
+}
+
+export type IntelligenceBrief = {
+  learned_signals_stored: number;
+  pattern_updates: number;
+  top_patterns: {
+    pattern: string;
+    good: number;
+    bad: number;
+    n: number;
+    net_confidence: number;
+  }[];
+  coaching_hint: string;
+};
+
+export function getIntelligenceBrief() {
+  return fetchJson<IntelligenceBrief>("/api/intelligence/brief");
+}

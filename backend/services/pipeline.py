@@ -27,6 +27,7 @@ from discovery.yelp import discover_yelp_terms
 from models import BusinessLead
 from outreach.audio import generate_audio_briefing
 from outreach.scripts import generate_call_script
+from services.learning_engine import apply_pattern_multiplier
 from scraping.browser import WebScraper
 from scraping.extractor import copyright_years, extract_text_and_features
 from scraping.pagespeed import run_pagespeed
@@ -270,6 +271,9 @@ async def analyze_lead_row(
     lead.technical_debt_score = int(scores["technical_debt_score"])
     lead.urgency_score = int(scores["urgency_score"])
     lead.lead_score = scores["lead_score"]
+    lead.lead_score = apply_pattern_multiplier(
+        db, float(lead.lead_score or 0), smb_fit, lead.website_builder
+    )
     lead.seo_score = int(scores["seo_score"])
     lead.mobile_score = int(scores["mobile_score"])
     lead.content_score = int(scores["content_score"])

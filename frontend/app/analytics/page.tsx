@@ -15,16 +15,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { analyticsSummary, getLeads } from "@/lib/api";
+import { analyticsSummary, getIntelligenceBrief, getLeads, type IntelligenceBrief } from "@/lib/api";
 
 const COLORS = ["#e8ff47", "#c4d93a", "#9ca3af", "#52525b", "#3f3f46", "#27272a"];
 
 export default function AnalyticsPage() {
   const [funnel, setFunnel] = useState<Record<string, number>>({});
   const [cats, setCats] = useState<{ name: string; value: number }[]>([]);
+  const [brief, setBrief] = useState<IntelligenceBrief | null>(null);
 
   useEffect(() => {
     analyticsSummary().then((r) => setFunnel(r.funnel));
+    getIntelligenceBrief().then(setBrief).catch(() => setBrief(null));
     getLeads({ limit: 500, sort: "newest", min_score: 0 }).then((r) => {
       const m: Record<string, number> = {};
       r.items.forEach((L) => {
@@ -51,6 +53,33 @@ export default function AnalyticsPage() {
           Pipeline density and category distribution across your corpus.
         </p>
       </div>
+
+      {brief ? (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-accent/20 bg-accent/[0.04] p-5 backdrop-blur-sm"
+        >
+          <h2 className="text-[11px] font-medium uppercase tracking-[0.2em] text-accent">Learning layer</h2>
+          <p className="mt-3 text-[14px] leading-relaxed text-zinc-300">{brief.coaching_hint}</p>
+          <p className="mt-2 text-[12px] text-zinc-600">
+            {brief.learned_signals_stored} stored signals · {brief.pattern_updates} pattern updates
+          </p>
+          {brief.top_patterns.length ? (
+            <ul className="mt-4 space-y-2 border-t border-white/[0.06] pt-4 text-[12px] text-zinc-500">
+              {brief.top_patterns.slice(0, 5).map((p) => (
+                <li key={p.pattern} className="flex flex-wrap justify-between gap-2 font-mono text-[11px]">
+                  <span className="text-zinc-400">{p.pattern}</span>
+                  <span>
+                    +{p.good} / −{p.bad} · net {p.net_confidence > 0 ? "+" : ""}
+                    {p.net_confidence}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </motion.div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <motion.div

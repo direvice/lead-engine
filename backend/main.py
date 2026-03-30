@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from config import get_settings, parse_cors_origins
 from database import get_db, init_db
 from models import BusinessLead, ScanJob
+from services.learning_engine import intelligence_brief, record_teaching_signal
 from services.scan_job import ScanRequest, active_scan_message, get_ai_router, run_scan_job
 
 logging.basicConfig(level=logging.INFO)
@@ -82,6 +83,13 @@ def _lead_to_dict(lead: BusinessLead) -> dict[str, Any]:
 class LeadUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
+
+
+class TeachBody(BaseModel):
+    signal: str  # good_target | bad_target
+
+
+VALID_TEACH = frozenset({"good_target", "bad_target"})
 
 
 @app.get("/api/ping")
@@ -172,12 +180,42 @@ def patch_lead(lead_id: int, body: LeadUpdate, db: Session = Depends(get_db)):
     lead = db.get(BusinessLead, lead_id)
     if not lead:
         raise HTTPException(404)
+    prev = lead.status
     if body.status:
         lead.status = body.status
     if body.notes is not None:
         lead.notes = body.notes
+    if body.status and body.status != prev:
+        try:
+            if body.status == "won":
+                record_teaching_signal(db, lead, "outcome_won")
+            elif body.status == "skip":
+                record_teaching_signal(db, lead, "outcome_skip")
+        except Exception as e:
+            logger.warning("Learning from status change failed: %s", e)
     db.commit()
     return _lead_to_dict(lead)
+
+
+@app.post("/api/leads/{lead_id}/teach")
+def teach_lead(lead_id: int, body: TeachBody, db: Session = Depends(get_db)):
+    if body.signal not in VALID_TEACH:
+        raise HTTPException(400, detail="signal must be good_target or bad_target")
+    lead = db.get(BusinessLead, lead_id)
+    if not lead:
+        raise HTTPException(404)
+    try:
+        meta = record_teaching_signal(db, lead, body.signal)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, detail=str(e)) from e
+    return {"ok": True, **meta}
+
+
+@app.get("/api/intelligence/brief")
+def api_intelligence_brief(db: Session = Depends(get_db)):
+    return intelligence_brief(db)
 
 
 @app.get("/api/analytics/summary")

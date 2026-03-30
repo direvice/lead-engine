@@ -164,6 +164,18 @@ class ZipScanState(Base):
     last_scan_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
+class LearningSignal(Base):
+    """Audit trail + driver for pattern-based score adaptation."""
+
+    __tablename__ = "learning_signals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    lead_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    signal: Mapped[str] = mapped_column(String(64), index=True)
+    context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+
 class SettingsRow(Base):
     __tablename__ = "app_settings"
 

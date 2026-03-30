@@ -1,0 +1,29 @@
+# Full stack in one command (needs Docker Desktop / Engine):
+#   cd lead-bot && docker compose up --build
+# Ensure backend/.env exists (copy from .env.example + GEOAPIFY_API_KEY).
+services:
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      DATABASE_URL: "sqlite:////app/data/leads.db"
+    volumes:
+      - lead-engine-db:/app/data
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  lead-engine-db:

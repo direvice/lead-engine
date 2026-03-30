@@ -55,6 +55,8 @@ chmod +x scripts/*.sh
 ./scripts/verify-stack.sh --smoke  # also curl /api/ping (start uvicorn on :8000 first)
 ```
 
+**Near–zero-touch:** see [ZERO-TOUCH.md](ZERO-TOUCH.md) — either connect Railway + Vercel to GitHub **once** (then only `git push`), or run **`./scripts/up.sh`** with Docker for a full local stack.
+
 ## Deploy backend (Docker)
 
 The API uses **Playwright** and must run on a container host (Railway, Render, Fly, etc.) — not Vercel.

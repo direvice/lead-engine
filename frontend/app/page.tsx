@@ -13,7 +13,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [q, setQ] = useState("");
-  const [minScore, setMinScore] = useState(60);
+  const [minScore, setMinScore] = useState(0);
   const [status, setStatus] = useState("");
   const { connected } = useApiConnection();
 
@@ -165,7 +165,15 @@ export default function DashboardPage() {
             <div className="rounded-2xl border border-dashed border-white/[0.08] px-6 py-16 text-center">
               <p className="text-sm font-medium text-zinc-400">No leads in view</p>
               <p className="mt-2 text-[13px] text-zinc-600">
-                Run a scan to populate the corpus, or widen filters.
+                {stats && stats.total_leads > 0 ? (
+                  <>
+                    You have <span className="text-zinc-500">{stats.total_leads}</span> in the corpus —
+                    try lowering <span className="text-zinc-500">min score</span> (new rows are often 0 until
+                    analysis finishes).
+                  </>
+                ) : (
+                  <>Run a scan to populate the corpus, or widen filters.</>
+                )}
               </p>
               <Link
                 href="/scan"

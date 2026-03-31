@@ -39,6 +39,9 @@ export type LeadFeatures = {
 
 export type Lead = {
   id: number;
+  place_id?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   business_name: string;
   category: string | null;
   address: string | null;
@@ -47,6 +50,11 @@ export type Lead = {
   website: string | null;
   google_rating: number | null;
   review_count: number | null;
+  no_website?: boolean | null;
+  scrape_error?: string | null;
+  load_time_ms?: number | null;
+  last_analyzed_at?: string | null;
+  email_pitch?: string | null;
   lead_score: number | null;
   revenue_opportunity_monthly: number | null;
   revenue_opportunity_desc: string | null;
@@ -54,6 +62,7 @@ export type Lead = {
   source: string;
   ai_summary: string | null;
   ai_pitch: string | null;
+  ai_urgency_reason?: string | null;
   ai_biggest_problem: string | null;
   ai_recommended_service: string | null;
   ai_estimated_value: string | null;
@@ -82,4 +91,5 @@ export type Stats = {
   new_this_week: number;
   total_monthly_opportunity: number;
   avg_lead_score: number;
+  pending_analysis?: number;
 };

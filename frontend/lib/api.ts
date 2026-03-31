@@ -100,6 +100,20 @@ export function recalculateLearnedScores() {
   }>("/api/intelligence/recalculate-scores", { method: "POST" });
 }
 
+export function queueAnalyzeLead(leadId: number) {
+  return fetchJson<{ ok: boolean; lead_id: number; status: string }>(
+    `/api/leads/${leadId}/analyze`,
+    { method: "POST" }
+  );
+}
+
+export function reanalyzePendingLeads(limit = 25) {
+  return fetchJson<{ ok: boolean; queued_count: number; lead_ids: number[] }>(
+    `/api/intelligence/reanalyze-pending?limit=${limit}`,
+    { method: "POST" }
+  );
+}
+
 /** Build CSV export URL (open in new tab / download). */
 export function leadsExportCsvUrl(opts: {
   minScore?: number;

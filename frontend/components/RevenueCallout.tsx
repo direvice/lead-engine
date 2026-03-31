@@ -5,9 +5,12 @@ import { motion } from "framer-motion";
 export function RevenueCallout({
   amount,
   subtitle,
+  analysisNote,
 }: {
   amount: number;
   subtitle?: string | null;
+  /** Shown when amount is 0 (e.g. analysis not run yet). */
+  analysisNote?: string | null;
 }) {
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -30,6 +33,11 @@ export function RevenueCallout({
         <span className="ml-1 text-lg font-normal text-zinc-500">/mo</span>
       </p>
       <p className="mt-2 text-[14px] text-zinc-400">Conservative modeled opportunity</p>
+      {amount <= 0 && analysisNote ? (
+        <p className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-[13px] leading-relaxed text-amber-100/80">
+          {analysisNote}
+        </p>
+      ) : null}
       {subtitle ? <p className="mt-4 text-[13px] leading-relaxed text-zinc-500">{subtitle}</p> : null}
     </motion.div>
   );

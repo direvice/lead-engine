@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { LeadCard } from "@/components/LeadCard";
 import { getPublicApiBase } from "@/lib/api-base";
-import { getLeads, getStats, leadsExportCsvUrl } from "@/lib/api";
+import { getLeads, getStats, leadsExportCsvUrl, reanalyzePendingLeads } from "@/lib/api";
 import { useApiConnection } from "@/components/SystemStatus";
 import type { Lead, Stats } from "@/lib/types";
 
@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const [hideChains, setHideChains] = useState(true);
   const [preferStatic, setPreferStatic] = useState(true);
   const [autopilot, setAutopilot] = useState(true);
+  const [batchMsg, setBatchMsg] = useState<string | null>(null);
   const { connected } = useApiConnection();
 
   useEffect(() => {
@@ -84,6 +85,40 @@ export default function DashboardPage() {
         </motion.div>
       ) : null}
 
+      {connected !== false && stats && (stats.pending_analysis ?? 0) > 0 ? (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-sky-500/25 bg-sky-500/[0.07] px-5 py-4 text-[13px] leading-relaxed text-sky-100/90"
+        >
+          <p className="font-medium text-sky-200">
+            {stats.pending_analysis} lead{stats.pending_analysis === 1 ? "" : "s"} missing full analysis
+          </p>
+          <p className="mt-1 text-sky-100/70">
+            Names and addresses are from discovery; scores, AI copy, and screenshots appear after Playwright + models run on
+            the API host. Queue a batch to backfill, then refresh in a few minutes.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="rounded-lg bg-sky-400/20 px-4 py-2 text-[13px] font-semibold text-sky-100 ring-1 ring-sky-400/30 transition hover:bg-sky-400/30"
+              onClick={() =>
+                reanalyzePendingLeads(25)
+                  .then((r) => {
+                    setBatchMsg(`Queued ${r.queued_count} lead(s). Refresh the page in 2–5 minutes.`);
+                    getStats().then(setStats).catch(() => {});
+                    setTimeout(() => setBatchMsg(null), 10000);
+                  })
+                  .catch(() => setBatchMsg("Could not queue — check API connection."))
+              }
+            >
+              Fill in missing analysis (25)
+            </button>
+            {batchMsg ? <span className="text-[12px] text-sky-200/80">{batchMsg}</span> : null}
+          </div>
+        </motion.div>
+      ) : null}
+
       <section className="animate-fade-up">
         <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-zinc-600">Overview</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
@@ -106,7 +141,7 @@ export default function DashboardPage() {
       </section>
 
       {stats ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {[
             ["Corpus", stats.total_leads.toLocaleString()],
             ["7d new", stats.new_this_week.toLocaleString()],
@@ -119,6 +154,7 @@ export default function DashboardPage() {
               }).format(stats.total_monthly_opportunity),
             ],
             ["Mean score", String(stats.avg_lead_score)],
+            ["Pipeline backlog", String(stats.pending_analysis ?? 0)],
           ].map(([k, v], i) => (
             <motion.div
               key={k}

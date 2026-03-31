@@ -2,9 +2,21 @@ import type { Lead } from "@/lib/types";
 
 const severityOrder = ["critical", "high", "medium", "low"];
 
-export function IssueList({ issues }: { issues: Lead["issues"] }) {
+export function IssueList({
+  issues,
+  emptyHint,
+}: {
+  issues: Lead["issues"];
+  /** Extra context when the issues array is empty (e.g. scrape failed). */
+  emptyHint?: string | null;
+}) {
   if (!issues?.length) {
-    return <p className="text-[13px] text-zinc-600">No structured issues for this lead.</p>;
+    return (
+      <div className="space-y-2 text-[13px] leading-relaxed text-zinc-600">
+        <p>No structured issues recorded for this lead yet.</p>
+        {emptyHint ? <p className="text-zinc-500">{emptyHint}</p> : null}
+      </div>
+    );
   }
   const grouped: Record<string, NonNullable<Lead["issues"]>> = {};
   issues.forEach((i) => {

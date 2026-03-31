@@ -19,8 +19,9 @@ from sqlalchemy import Float, cast, func, or_
 from sqlalchemy.orm import Session
 
 from config import get_settings, parse_cors_origins
-from database import get_db, init_db
+from database import SessionLocal, get_db, init_db
 from models import BusinessLead, ScanJob
+from services.pipeline import analyze_lead_row
 from services.learning_engine import (
     intelligence_brief,
     recalculate_all_scores,
@@ -124,11 +125,23 @@ def api_stats(db: Session = Depends(get_db)):
     )
     opp = db.query(func.sum(BusinessLead.revenue_opportunity_monthly)).scalar() or 0
     avg = db.query(func.avg(BusinessLead.lead_score)).scalar() or 0
+    pending_analysis = (
+        db.query(func.count(BusinessLead.id))
+        .filter(
+            or_(
+                BusinessLead.last_analyzed_at.is_(None),
+                BusinessLead.lead_score.is_(None),
+            )
+        )
+        .scalar()
+        or 0
+    )
     return {
         "total_leads": total,
         "new_this_week": new_week,
         "total_monthly_opportunity": int(opp),
         "avg_lead_score": round(float(avg), 1),
+        "pending_analysis": int(pending_analysis),
     }
 
 
@@ -299,6 +312,71 @@ def get_lead(lead_id: int, db: Session = Depends(get_db)):
     if not lead:
         raise HTTPException(404)
     return _lead_to_dict(lead)
+
+
+@app.post("/api/leads/{lead_id}/analyze")
+async def queue_analyze_lead(lead_id: int, db: Session = Depends(get_db)):
+    """Queue a full re-analysis (scrape, scores, AI). Returns immediately; refresh the dossier after ~30–90s."""
+    if db.get(BusinessLead, lead_id) is None:
+        raise HTTPException(404)
+
+    async def _run() -> None:
+        db2 = SessionLocal()
+        try:
+            lead = db2.get(BusinessLead, lead_id)
+            if not lead:
+                return
+            router = get_ai_router()
+            sem = asyncio.Semaphore(get_settings().max_concurrent_scrapers)
+            await analyze_lead_row(db2, lead, router, sem)
+        except Exception as e:
+            logger.exception("Analyze lead %s failed: %s", lead_id, e)
+        finally:
+            db2.close()
+
+    asyncio.create_task(_run())
+    return {"ok": True, "lead_id": lead_id, "status": "queued"}
+
+
+@app.post("/api/intelligence/reanalyze-pending")
+async def reanalyze_pending(limit: int = Query(25, le=80)):
+    """Process leads that were never fully analyzed (common after failed scan steps)."""
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(BusinessLead)
+            .filter(
+                or_(
+                    BusinessLead.last_analyzed_at.is_(None),
+                    BusinessLead.lead_score.is_(None),
+                )
+            )
+            .order_by(BusinessLead.id)
+            .limit(limit)
+            .all()
+        )
+        ids = [r.id for r in rows]
+    finally:
+        db.close()
+
+    async def _batch() -> None:
+        db2 = SessionLocal()
+        try:
+            router = get_ai_router()
+            sem = asyncio.Semaphore(get_settings().max_concurrent_scrapers)
+            for lid in ids:
+                lead = db2.get(BusinessLead, lid)
+                if not lead:
+                    continue
+                try:
+                    await analyze_lead_row(db2, lead, router, sem)
+                except Exception as e:
+                    logger.exception("Batch analyze %s failed: %s", lid, e)
+        finally:
+            db2.close()
+
+    asyncio.create_task(_batch())
+    return {"ok": True, "queued_count": len(ids), "lead_ids": ids}
 
 
 @app.patch("/api/leads/{lead_id}")

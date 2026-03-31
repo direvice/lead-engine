@@ -10,8 +10,9 @@ import { CompetitorCard } from "@/components/CompetitorCard";
 import { IssueList } from "@/components/IssueList";
 import { RevenueCallout } from "@/components/RevenueCallout";
 import { ScoreRing } from "@/components/ScoreRing";
-import { getLead, patchLead, teachLead } from "@/lib/api";
+import { getLead, patchLead, queueAnalyzeLead, teachLead } from "@/lib/api";
 import { staticFileUrl } from "@/lib/assets";
+import { googleMapsUrl, googleSearchUrl, normalizeWebsiteUrl } from "@/lib/outreach-links";
 import type { Lead } from "@/lib/types";
 
 export default function LeadDetailPage() {
@@ -20,6 +21,7 @@ export default function LeadDetailPage() {
   const [lead, setLead] = useState<Lead | null>(null);
   const [notes, setNotes] = useState("");
   const [teachMsg, setTeachMsg] = useState<string | null>(null);
+  const [analyzeMsg, setAnalyzeMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -47,6 +49,18 @@ export default function LeadDetailPage() {
     review_count?: number;
   }[];
 
+  const web = normalizeWebsiteUrl(lead.website);
+  const maps = googleMapsUrl(lead);
+  const analyzed = Boolean(lead.last_analyzed_at);
+  const listingBlurb = [
+    lead.category,
+    lead.google_rating != null ? `${lead.google_rating}★` : null,
+    lead.review_count != null ? `${lead.review_count} reviews` : null,
+    lead.address,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <div className="space-y-10">
       <div>
@@ -71,6 +85,68 @@ export default function LeadDetailPage() {
               {lead.phone}
             </a>
           ) : null}
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            {web ? (
+              <a
+                href={web}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-2 text-[13px] font-semibold text-accent transition hover:bg-accent/20"
+              >
+                Website ↗
+              </a>
+            ) : (
+              <span className="rounded-xl border border-white/[0.08] px-4 py-2 text-[13px] text-zinc-600">
+                No website URL
+              </span>
+            )}
+            {maps ? (
+              <a
+                href={maps}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl border border-white/[0.12] bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-zinc-200 transition hover:border-white/[0.2] hover:text-white"
+              >
+                Google Maps ↗
+              </a>
+            ) : null}
+            <a
+              href={googleSearchUrl(lead.business_name, lead.address)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[13px] text-zinc-300 transition hover:border-white/[0.12] hover:text-white"
+            >
+              Search business ↗
+            </a>
+            <button
+              type="button"
+              className="rounded-xl border border-white/[0.12] bg-white/[0.06] px-4 py-2 text-[13px] font-medium text-white transition hover:bg-white/[0.1]"
+              onClick={() =>
+                queueAnalyzeLead(lead.id)
+                  .then(() => {
+                    setAnalyzeMsg("Analysis queued — wait ~30–90s, then refresh this page.");
+                    setTimeout(() => setAnalyzeMsg(null), 8000);
+                  })
+                  .catch(() => setAnalyzeMsg("Could not queue — check API / Playwright on host."))
+              }
+            >
+              Re-run analysis
+            </button>
+          </div>
+          {analyzeMsg ? <p className="mt-3 text-[12px] text-zinc-500">{analyzeMsg}</p> : null}
+          {!analyzed ? (
+            <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-amber-200/70">
+              No completed analysis on record. Scores and AI blocks fill in after the pipeline runs (Playwright scrape +
+              scoring + model). Use Re-run analysis, or Command → Fill in missing analysis for a batch.
+            </p>
+          ) : null}
+          {listingBlurb ? (
+            <p className="mt-3 max-w-2xl text-[13px] text-zinc-600">
+              <span className="font-medium text-zinc-500">Listing snapshot · </span>
+              {listingBlurb}
+            </p>
+          ) : null}
         </motion.div>
       </div>
 
@@ -79,6 +155,13 @@ export default function LeadDetailPage() {
           <RevenueCallout
             amount={lead.revenue_opportunity_monthly || 0}
             subtitle={lead.revenue_opportunity_desc}
+            analysisNote={
+              !analyzed
+                ? "Revenue and scores are modeled after a full analysis. Queue Re-run analysis above."
+                : lead.scrape_error
+                  ? `Scrape note: ${lead.scrape_error.slice(0, 200)}${lead.scrape_error.length > 200 ? "…" : ""}`
+                  : null
+            }
           />
 
           <div>
@@ -92,7 +175,11 @@ export default function LeadDetailPage() {
             </div>
             <p className="mt-4 text-[12px] text-zinc-600">
               PageSpeed mobile {lead.pagespeed_mobile ?? "—"} · desktop {lead.pagespeed_desktop ?? "—"}
+              {lead.load_time_ms != null ? ` · first paint ~${lead.load_time_ms}ms` : ""}
             </p>
+            {!analyzed ? (
+              <p className="mt-2 text-[12px] text-zinc-600">Scores stay at 0 until analysis completes.</p>
+            ) : null}
           </div>
 
           {lead.features?.smb_fit ? (
@@ -196,7 +283,16 @@ export default function LeadDetailPage() {
           <section>
             <h2 className="text-[13px] font-medium uppercase tracking-wider text-zinc-500">Issues</h2>
             <div className="mt-4">
-              <IssueList issues={lead.issues} />
+              <IssueList
+                issues={lead.issues}
+                emptyHint={
+                  lead.scrape_error
+                    ? `Scrape/load: ${lead.scrape_error}. After a successful run, issues populate from HTML + PageSpeed.`
+                    : !analyzed
+                      ? "Run analysis to generate structured issues from the live site."
+                      : null
+                }
+              />
             </div>
           </section>
 
@@ -227,9 +323,17 @@ export default function LeadDetailPage() {
           <section>
             <h2 className="text-[13px] font-medium uppercase tracking-wider text-zinc-500">Competitors</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {comps.slice(0, 3).map((c, i) => (
-                <CompetitorCard key={i} name={c.name || "—"} rating={c.rating} review_count={c.review_count} />
-              ))}
+              {comps.length ? (
+                comps.slice(0, 3).map((c, i) => (
+                  <CompetitorCard key={i} name={c.name || "—"} rating={c.rating} review_count={c.review_count} />
+                ))
+              ) : (
+                <p className="col-span-full text-[13px] text-zinc-600">
+                  No competitor list yet. The engine uses Google Places nearby search when{" "}
+                  <code className="rounded bg-white/[0.06] px-1 font-mono text-[11px]">GOOGLE_PLACES_API_KEY</code> is set
+                  and coordinates exist.
+                </p>
+              )}
             </div>
             {lead.competitive_gaps?.length ? (
               <ul className="mt-4 space-y-2 text-[13px] leading-relaxed text-zinc-500">
@@ -259,6 +363,11 @@ export default function LeadDetailPage() {
                   alt="Mobile"
                   className="rounded-2xl border border-white/[0.06] bg-black/20"
                 />
+              ) : null}
+              {!lead.desktop_screenshot_path && !lead.mobile_screenshot_path ? (
+                <p className="col-span-full text-[13px] text-zinc-600">
+                  No screenshots yet — captured during site analysis when Playwright runs successfully.
+                </p>
               ) : null}
             </div>
           </section>
@@ -305,12 +414,28 @@ export default function LeadDetailPage() {
 
           <div className="rounded-2xl border border-white/[0.06] bg-card/70 p-5 backdrop-blur-sm">
             <h3 className="text-[11px] font-medium uppercase tracking-[0.2em] text-accent">Intelligence</h3>
-            <p className="mt-3 text-[14px] leading-relaxed text-zinc-400">{lead.ai_summary}</p>
+            <p className="mt-3 text-[14px] leading-relaxed text-zinc-400">
+              {lead.ai_summary ||
+                (!analyzed
+                  ? "Summary appears after the AI pass. If this stays empty, the model may be unavailable (configure Ollama or GEMINI_API_KEY on the API host) or analysis never finished."
+                  : "No summary stored for this lead.")}
+            </p>
+            {lead.ai_urgency_reason ? (
+              <p className="mt-3 text-[12px] leading-relaxed text-zinc-500">
+                <span className="font-medium text-zinc-400">Urgency · </span>
+                {lead.ai_urgency_reason}
+              </p>
+            ) : null}
             <p className="mt-5 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Pitch</p>
-            <p className="mt-2 text-[14px] font-medium leading-relaxed text-white">{lead.ai_pitch}</p>
+            <p className="mt-2 text-[14px] font-medium leading-relaxed text-white">
+              {lead.ai_pitch ||
+                (!analyzed
+                  ? "Cold-call opener will generate after analysis."
+                  : "—")}
+            </p>
             <div className="mt-4 space-y-1 text-[12px] text-zinc-600">
-              <p>Service · {lead.ai_recommended_service}</p>
-              <p>Estimate · {lead.ai_estimated_value}</p>
+              <p>Service · {lead.ai_recommended_service || "—"}</p>
+              <p>Estimate · {lead.ai_estimated_value || "—"}</p>
             </div>
             <button
               type="button"
@@ -319,6 +444,21 @@ export default function LeadDetailPage() {
             >
               Copy pitch
             </button>
+            {lead.email_pitch ? (
+              <>
+                <p className="mt-5 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Email draft</p>
+                <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-[12px] leading-relaxed text-zinc-500">
+                  {lead.email_pitch}
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 text-[12px] font-medium text-zinc-400 hover:text-accent"
+                  onClick={() => navigator.clipboard.writeText(lead.email_pitch || "")}
+                >
+                  Copy email
+                </button>
+              </>
+            ) : null}
           </div>
 
           <CallScript script={lead.call_script} />
@@ -357,11 +497,11 @@ export default function LeadDetailPage() {
                 Copy phone
               </button>
             ) : null}
-            {lead.website ? (
+            {web ? (
               <a
-                href={lead.website}
+                href={web}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[13px] text-zinc-300 transition hover:border-accent/30 hover:text-accent"
               >
                 Website

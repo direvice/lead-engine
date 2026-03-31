@@ -28,7 +28,7 @@ from models import BusinessLead
 from outreach.audio import generate_audio_briefing
 from outreach.scripts import generate_call_script
 from services.learning_engine import apply_pattern_multiplier
-from scraping.browser import WebScraper
+from scraping.browser import ScrapedData, WebScraper
 from scraping.extractor import copyright_years, extract_text_and_features
 from scraping.pagespeed import run_pagespeed
 from scraping.social import score_social
@@ -144,7 +144,11 @@ async def analyze_lead_row(
 
     async with sem:
         if not no_website:
-            data = await scraper.scrape(website, lead.id)
+            try:
+                data = await scraper.scrape(website, lead.id)
+            except Exception as e:
+                logger.exception("Lead %s scrape raised: %s", lead.id, e)
+                data = ScrapedData(load_error=str(e))
             scraped_meta = {
                 "load_error": data.load_error,
                 "robots_blocked": data.robots_blocked,

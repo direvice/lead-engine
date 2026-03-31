@@ -80,69 +80,76 @@ class WebScraper:
                 headless=True,
                 args=["--no-sandbox", "--disable-dev-shm-usage"],
             )
-            context = await browser.new_context(
-                viewport={"width": 1280, "height": 800},
-                user_agent=UA,
-                ignore_https_errors=True,
-            )
-            page = await context.new_page()
+            try:
+                context = await browser.new_context(
+                    viewport={"width": 1280, "height": 800},
+                    user_agent=UA,
+                    ignore_https_errors=True,
+                )
+                page = await context.new_page()
 
-            def on_console(msg) -> None:
-                if msg.type == "error":
-                    console_errors.append(msg.text[:500])
+                def on_console(msg) -> None:
+                    if msg.type == "error":
+                        console_errors.append(msg.text[:500])
 
-            def on_page_error(err) -> None:
-                page_errors.append(str(err)[:500])
+                def on_page_error(err) -> None:
+                    page_errors.append(str(err)[:500])
 
-            def on_response(resp) -> None:
+                def on_response(resp) -> None:
+                    try:
+                        responses.append(
+                            {
+                                "url": resp.url[:300],
+                                "status": resp.status,
+                            }
+                        )
+                    except Exception:
+                        pass
+
+                page.on("console", on_console)
+                page.on("pageerror", on_page_error)
+                page.on("response", on_response)
+
+                start = time.time()
                 try:
-                    responses.append(
-                        {
-                            "url": resp.url[:300],
-                            "status": resp.status,
-                        }
-                    )
+                    await page.goto(url, wait_until="networkidle", timeout=15000)
+                except Exception as e:
+                    return ScrapedData(load_error=str(e))
+
+                load_time = int((time.time() - start) * 1000)
+                desktop_shot = await page.screenshot(full_page=False)
+                desktop_compressed = compress_screenshot(desktop_shot, max_kb=150)
+                html = await page.content()
+
+                await page.set_viewport_size({"width": 375, "height": 812})
+                await page.wait_for_timeout(500)
+                mobile_shot = await page.screenshot(full_page=False)
+                mobile_width = await page.evaluate("document.body.scrollWidth")
+                has_horizontal_scroll = bool(mobile_width and mobile_width > 380)
+                mobile_compressed = compress_screenshot(mobile_shot, max_kb=100)
+
+                dpath = save_screenshot(
+                    desktop_compressed, f"{lead_id}_desktop_{int(time.time())}.jpg"
+                )
+                mpath = save_screenshot(
+                    mobile_compressed, f"{lead_id}_mobile_{int(time.time())}.jpg"
+                )
+
+                return ScrapedData(
+                    html=html,
+                    load_time_ms=load_time,
+                    has_horizontal_scroll=has_horizontal_scroll,
+                    console_errors=console_errors[:50],
+                    page_errors=page_errors[:50],
+                    network_sample=responses[:200],
+                    desktop_path=dpath,
+                    mobile_path=mpath,
+                )
+            except Exception as e:
+                logger.exception("Playwright scrape failed for %s: %s", url, e)
+                return ScrapedData(load_error=str(e))
+            finally:
+                try:
+                    await browser.close()
                 except Exception:
                     pass
-
-            page.on("console", on_console)
-            page.on("pageerror", on_page_error)
-            page.on("response", on_response)
-
-            start = time.time()
-            try:
-                await page.goto(url, wait_until="networkidle", timeout=15000)
-            except Exception as e:
-                await browser.close()
-                return ScrapedData(load_error=str(e))
-
-            load_time = int((time.time() - start) * 1000)
-            desktop_shot = await page.screenshot(full_page=False)
-            desktop_compressed = compress_screenshot(desktop_shot, max_kb=150)
-            html = await page.content()
-
-            await page.set_viewport_size({"width": 375, "height": 812})
-            await page.wait_for_timeout(500)
-            mobile_shot = await page.screenshot(full_page=False)
-            mobile_width = await page.evaluate("document.body.scrollWidth")
-            has_horizontal_scroll = bool(mobile_width and mobile_width > 380)
-            mobile_compressed = compress_screenshot(mobile_shot, max_kb=100)
-
-            dpath = save_screenshot(
-                desktop_compressed, f"{lead_id}_desktop_{int(time.time())}.jpg"
-            )
-            mpath = save_screenshot(
-                mobile_compressed, f"{lead_id}_mobile_{int(time.time())}.jpg"
-            )
-            await browser.close()
-
-        return ScrapedData(
-            html=html,
-            load_time_ms=load_time,
-            has_horizontal_scroll=has_horizontal_scroll,
-            console_errors=console_errors[:50],
-            page_errors=page_errors[:50],
-            network_sample=responses[:200],
-            desktop_path=dpath,
-            mobile_path=mpath,
-        )

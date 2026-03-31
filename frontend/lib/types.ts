@@ -22,9 +22,17 @@ export type AiSmbIntel = {
   what_not_to_sell?: string;
 };
 
+export type SiteIntel = {
+  archetype?: string;
+  static_affinity?: number;
+  spa_risk?: number;
+  spa_marker_hits?: number;
+};
+
 export type LeadFeatures = {
   smb_fit?: SmbFit;
   ai_smb_intel?: AiSmbIntel;
+  site_intel?: SiteIntel;
   builder?: string;
   [key: string]: unknown;
 };

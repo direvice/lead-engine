@@ -287,6 +287,21 @@ async def analyze_lead_row(
 
     smb_signals = str(smb_fit)[:2200]
 
+    si_pre = features.get("site_intel") or {}
+    if no_website:
+        site_intel_line = (
+            "No live page — prioritize 'no site' or listings-only positioning; skip stack commentary."
+        )
+    elif si_pre.get("archetype"):
+        site_intel_line = (
+            f"Archetype `{si_pre.get('archetype')}` · static_affinity={si_pre.get('static_affinity')} "
+            f"(higher ≈ simpler brochure HTML) · spa_risk={si_pre.get('spa_risk')}. "
+            "Match easy_wins and tech_simplicity_note to this shape; avoid enterprise replatform talk on brochure_static, "
+            "avoid trivial CSS tweaks as the whole plan on app_like."
+        )
+    else:
+        site_intel_line = "Page shape unknown — keep stack advice conservative."
+
     prompt = ANALYSIS_PROMPT.format(
         name=lead.business_name,
         category=lead.category or "",
@@ -298,6 +313,7 @@ async def analyze_lead_row(
         missing_features=", ".join(missing) or "none listed",
         opportunity_calc=rev,
         smb_signals=smb_signals,
+        site_intel=site_intel_line,
     )
 
     try:

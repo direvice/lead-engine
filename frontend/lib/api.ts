@@ -101,10 +101,17 @@ export function recalculateLearnedScores() {
 }
 
 /** Build CSV export URL (open in new tab / download). */
-export function leadsExportCsvUrl(opts: { minScore?: number; excludeLikelyChain?: boolean }) {
+export function leadsExportCsvUrl(opts: {
+  minScore?: number;
+  excludeLikelyChain?: boolean;
+  autopilot?: boolean;
+  preferStatic?: boolean;
+}) {
   const q = new URLSearchParams();
   if (opts.minScore != null && opts.minScore > 0) q.set("min_score", String(opts.minScore));
   if (opts.excludeLikelyChain) q.set("exclude_likely_chain", "true");
+  if (opts.autopilot) q.set("autopilot", "true");
+  if (opts.preferStatic && !opts.autopilot) q.set("prefer_static", "true");
   const qs = q.toString();
   return apiUrl(`/api/leads/export.csv${qs ? `?${qs}` : ""}`);
 }

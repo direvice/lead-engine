@@ -15,7 +15,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import Float, cast, func, or_
 from sqlalchemy.orm import Session
 
 from config import get_settings, parse_cors_origins
@@ -143,9 +143,15 @@ def list_leads(
     sort: str = "lead_score",
     smb_tier: Optional[str] = None,
     exclude_likely_chain: bool = False,
+    autopilot: bool = False,
+    prefer_static: bool = False,
     limit: int = Query(100, le=500),
     offset: int = 0,
 ):
+    if autopilot:
+        exclude_likely_chain = True
+        prefer_static = True
+
     query = db.query(BusinessLead)
     if q:
         like = f"%{q}%"
@@ -173,7 +179,19 @@ def list_leads(
                 func.coalesce(tier_json, "") != "likely_chain",
             )
         )
+    arch_json = func.json_extract(BusinessLead.features, "$.site_intel.archetype")
+    if prefer_static:
+        query = query.filter(
+            or_(
+                BusinessLead.features.is_(None),
+                func.coalesce(arch_json, "") != "app_like",
+            )
+        )
     smb_idx_json = func.json_extract(BusinessLead.features, "$.smb_fit.smb_fit_index")
+    static_aff_expr = func.coalesce(
+        cast(func.json_extract(BusinessLead.features, "$.site_intel.static_affinity"), Float),
+        0.0,
+    )
     if sort == "revenue":
         query = query.order_by(BusinessLead.revenue_opportunity_monthly.desc().nullslast())
     elif sort == "newest":
@@ -182,6 +200,12 @@ def list_leads(
         query = query.order_by(BusinessLead.business_name)
     elif sort == "smb_fit":
         query = query.order_by(smb_idx_json.desc().nullslast())
+    elif autopilot:
+        query = query.order_by(
+            BusinessLead.lead_score.desc().nullslast(),
+            static_aff_expr.desc(),
+            smb_idx_json.desc().nullslast(),
+        )
     else:
         query = query.order_by(BusinessLead.lead_score.desc().nullslast())
     rows = query.offset(offset).limit(limit).all()
@@ -193,7 +217,13 @@ def export_leads_csv(
     db: Session = Depends(get_db),
     min_score: float = 0,
     exclude_likely_chain: bool = False,
+    autopilot: bool = False,
+    prefer_static: bool = False,
 ):
+    if autopilot:
+        exclude_likely_chain = True
+        prefer_static = True
+
     query = db.query(BusinessLead)
     if min_score:
         query = query.filter(BusinessLead.lead_score >= min_score)
@@ -203,6 +233,14 @@ def export_leads_csv(
             or_(
                 BusinessLead.features.is_(None),
                 func.coalesce(tier_json, "") != "likely_chain",
+            )
+        )
+    arch_json = func.json_extract(BusinessLead.features, "$.site_intel.archetype")
+    if prefer_static:
+        query = query.filter(
+            or_(
+                BusinessLead.features.is_(None),
+                func.coalesce(arch_json, "") != "app_like",
             )
         )
     rows = (
@@ -221,6 +259,8 @@ def export_leads_csv(
             "lead_score",
             "smb_tier",
             "smb_fit_index",
+            "site_archetype",
+            "static_affinity",
             "status",
             "revenue_monthly",
         ]
@@ -228,6 +268,7 @@ def export_leads_csv(
     for r in rows:
         feats = r.features if isinstance(r.features, dict) else {}
         smb = feats.get("smb_fit") or {}
+        si = feats.get("site_intel") or {}
         w.writerow(
             [
                 r.id,
@@ -239,6 +280,8 @@ def export_leads_csv(
                 r.lead_score or 0,
                 smb.get("target_tier") or "",
                 smb.get("smb_fit_index") or "",
+                si.get("archetype") or "",
+                si.get("static_affinity") or "",
                 r.status,
                 r.revenue_opportunity_monthly or 0,
             ]

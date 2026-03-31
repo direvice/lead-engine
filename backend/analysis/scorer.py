@@ -128,6 +128,17 @@ def compute_scores(
         final = min(100.0, final * 1.14)
         opportunity = min(100.0, opportunity + 10.0)
 
+    # Brochure / static HTML sites are faster wins; heavy SPA shells are harder solo-dev fits.
+    if not no_website:
+        si = features.get("site_intel") or {}
+        arch = si.get("archetype") or "mixed"
+        if arch == "brochure_static":
+            final = min(100.0, final * 1.08)
+            opportunity = min(100.0, opportunity + 5.0)
+        elif arch == "app_like":
+            final *= 0.87
+            opportunity = max(0.0, opportunity * 0.84)
+
     final = min(100.0, max(0.0, final))
 
     # Sub-scores for UI rings (derived)

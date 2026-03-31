@@ -18,6 +18,8 @@ export default function DashboardPage() {
   const [sort, setSort] = useState<"lead_score" | "smb_fit" | "newest" | "revenue">("lead_score");
   const [smbTier, setSmbTier] = useState("");
   const [hideChains, setHideChains] = useState(true);
+  const [preferStatic, setPreferStatic] = useState(true);
+  const [autopilot, setAutopilot] = useState(true);
   const { connected } = useApiConnection();
 
   useEffect(() => {
@@ -25,6 +27,16 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (autopilot) {
+      getLeads({
+        autopilot: true,
+        q: q || undefined,
+        limit: 80,
+      })
+        .then((r) => setLeads(r.items))
+        .catch(() => setLeads([]));
+      return;
+    }
     getLeads({
       min_score: minScore,
       q: q || undefined,
@@ -32,11 +44,12 @@ export default function DashboardPage() {
       sort,
       smb_tier: smbTier || undefined,
       exclude_likely_chain: hideChains || undefined,
+      prefer_static: preferStatic || undefined,
       limit: 80,
     })
       .then((r) => setLeads(r.items))
       .catch(() => setLeads([]));
-  }, [q, minScore, status, sort, smbTier, hideChains]);
+  }, [q, minScore, status, sort, smbTier, hideChains, preferStatic, autopilot]);
 
   const hero = useMemo(() => {
     if (!stats) return null;
@@ -87,7 +100,8 @@ export default function DashboardPage() {
           )}
         </h1>
         <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-zinc-500">
-          Ranked by opportunity. Every row is scored, audited, and ready for outreach.
+          Autopilot ranks independent locals, hides heavy JS app shells from the queue, and surfaces
+          brochure-style sites the engine can actually fix—then AI writes the pitch.
         </p>
       </section>
 
@@ -121,99 +135,164 @@ export default function DashboardPage() {
       ) : null}
 
       <section className="space-y-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-          <div className="min-w-0 flex-1">
-            <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
-              Filter
-            </label>
-            <input
-              className="input-intel mt-2"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search business name…"
-            />
+        <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-card/40 p-4 shadow-card backdrop-blur-sm sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+                Search
+              </label>
+              <input
+                className="input-intel mt-2"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Business name…"
+              />
+            </div>
+            <div className="flex flex-col gap-2 sm:items-end">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-600 sm:text-right">
+                Queue mode
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAutopilot(true)}
+                  className={`rounded-xl px-4 py-2.5 text-[13px] font-semibold transition ${
+                    autopilot
+                      ? "bg-accent text-zinc-950 shadow-[0_0_24px_-4px_rgba(232,255,71,0.45)]"
+                      : "bg-white/[0.06] text-zinc-300 ring-1 ring-white/[0.08] hover:bg-white/[0.09]"
+                  }`}
+                >
+                  Autopilot queue
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAutopilot(false)}
+                  className={`rounded-xl px-4 py-2.5 text-[13px] font-medium transition ${
+                    !autopilot
+                      ? "bg-white/[0.1] text-white ring-1 ring-accent/25"
+                      : "bg-white/[0.04] text-zinc-500 ring-1 ring-white/[0.06] hover:text-zinc-300"
+                  }`}
+                >
+                  Manual filters
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="w-full lg:w-48">
-            <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
-              Min score · {minScore}
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={minScore}
-              onChange={(e) => setMinScore(Number(e.target.value))}
-              className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-accent"
-            />
-          </div>
-          <div className="w-full lg:w-40">
-            <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
-              Pipeline
-            </label>
-            <select
-              className="input-intel mt-2"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="">All states</option>
-              <option value="new">New</option>
-              <option value="contacted">Contacted</option>
-              <option value="interested">Interested</option>
-              <option value="won">Won</option>
-              <option value="skip">Skip</option>
-            </select>
-          </div>
-          <div className="w-full lg:w-44">
-            <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
-              Sort
-            </label>
-            <select
-              className="input-intel mt-2"
-              value={sort}
-              onChange={(e) => setSort(e.target.value as typeof sort)}
-            >
-              <option value="lead_score">Lead score</option>
-              <option value="smb_fit">SMB fit index</option>
-              <option value="revenue">Revenue</option>
-              <option value="newest">Newest</option>
-            </select>
-          </div>
-          <div className="w-full lg:w-44">
-            <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
-              SMB tier
-            </label>
-            <select
-              className="input-intel mt-2"
-              value={smbTier}
-              onChange={(e) => setSmbTier(e.target.value)}
-            >
-              <option value="">Any</option>
-              <option value="ideal_smb">Ideal local</option>
-              <option value="borderline">Borderline</option>
-              <option value="likely_chain">Likely chain</option>
-            </select>
-          </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-4 text-[13px] text-zinc-500">
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={hideChains}
-              onChange={(e) => setHideChains(e.target.checked)}
-              className="rounded border-zinc-600 bg-zinc-900 accent-accent"
-            />
-            Hide likely chains
-          </label>
-          {apiBase ? (
-            <a
-              href={leadsExportCsvUrl({ minScore, excludeLikelyChain: hideChains })}
-              className="text-accent hover:text-[#f0ff6a]"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Export CSV ↓
-            </a>
+          {autopilot ? (
+            <p className="text-[13px] leading-relaxed text-zinc-500">
+              <span className="text-zinc-400">Active:</span> chains deprioritized · app-like / SPA shells filtered out
+              · ranked by score, then static-site fit, then SMB index. Re-analyze older rows to populate site shape
+              signals.
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-4">
+            {apiBase ? (
+              <a
+                href={leadsExportCsvUrl(
+                  autopilot
+                    ? { autopilot: true }
+                    : {
+                        minScore,
+                        excludeLikelyChain: hideChains,
+                        preferStatic: preferStatic,
+                      }
+                )}
+                className="inline-flex items-center rounded-lg bg-white/[0.06] px-3 py-2 text-[13px] font-medium text-accent ring-1 ring-white/[0.08] transition hover:bg-white/[0.1]"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Export CSV
+              </a>
+            ) : null}
+          </div>
+
+          {!autopilot ? (
+            <div className="space-y-4 border-t border-white/[0.06] pt-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+                    Min score · {minScore}
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={minScore}
+                    onChange={(e) => setMinScore(Number(e.target.value))}
+                    className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-accent"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+                    Pipeline
+                  </label>
+                  <select
+                    className="input-intel mt-2"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                  >
+                    <option value="">All states</option>
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="interested">Interested</option>
+                    <option value="won">Won</option>
+                    <option value="skip">Skip</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+                    Sort
+                  </label>
+                  <select
+                    className="input-intel mt-2"
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as typeof sort)}
+                  >
+                    <option value="lead_score">Lead score</option>
+                    <option value="smb_fit">SMB fit index</option>
+                    <option value="revenue">Revenue</option>
+                    <option value="newest">Newest</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+                    SMB tier
+                  </label>
+                  <select
+                    className="input-intel mt-2"
+                    value={smbTier}
+                    onChange={(e) => setSmbTier(e.target.value)}
+                  >
+                    <option value="">Any</option>
+                    <option value="ideal_smb">Ideal local</option>
+                    <option value="borderline">Borderline</option>
+                    <option value="likely_chain">Likely chain</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-6 text-[13px] text-zinc-500">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={hideChains}
+                    onChange={(e) => setHideChains(e.target.checked)}
+                    className="rounded border-zinc-600 bg-zinc-900 accent-accent"
+                  />
+                  Hide likely chains
+                </label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={preferStatic}
+                    onChange={(e) => setPreferStatic(e.target.checked)}
+                    className="rounded border-zinc-600 bg-zinc-900 accent-accent"
+                  />
+                  Prefer brochure / static HTML (drop app-like)
+                </label>
+              </div>
+            </div>
           ) : null}
         </div>
 
@@ -225,11 +304,22 @@ export default function DashboardPage() {
                 {stats && stats.total_leads > 0 ? (
                   <>
                     You have <span className="text-zinc-500">{stats.total_leads}</span> in the corpus —
-                    try lowering <span className="text-zinc-500">min score</span> (new rows are often 0 until
-                    analysis finishes).
+                    {autopilot ? (
+                      <>
+                        {" "}
+                        Autopilot hides SPA-style sites; switch to{" "}
+                        <span className="text-zinc-500">Manual filters</span> to see everything, or re-run analysis
+                        for site-shape data.
+                      </>
+                    ) : (
+                      <>
+                        {" "}
+                        try lowering <span className="text-zinc-500">min score</span> or toggling filters.
+                      </>
+                    )}
                   </>
                 ) : (
-                  <>Run a scan to populate the corpus, or widen filters.</>
+                  <>Run a scan to populate the corpus.</>
                 )}
               </p>
               <Link

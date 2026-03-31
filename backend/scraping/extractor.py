@@ -8,6 +8,29 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, NavigableString
 
+# Strong signals the first HTML payload is a JS-heavy SPA / framework shell (not a classic brochure site).
+_SPA_FRAMEWORK_MARKERS: tuple[str, ...] = (
+    "__next_data__",
+    "__next_f.push",
+    "data-reactroot",
+    "data-react-helmet",
+    "react-dom.production",
+    "react-dom@",
+    "_nuxt",
+    "__nuxt__",
+    "ng-version",
+    "zone.js",
+    "sveltekit",
+    "sapper",
+    "___gatsby",
+    "gatsby-script",
+    "webpackjsonp",
+    "vite-plugin",
+    "single-page application",
+    "ember.js",
+    "stimulus.min.js",
+)
+
 BUILDER_SIGNATURES: dict[str, list[str]] = {
     "Wix": ["wixstatic.com", "wix.com", "_wix_"],
     "GoDaddy": ["wsimg.com", "godaddy.com/websites", "secureserver.net"],
@@ -30,6 +53,53 @@ def detect_builder(html: str) -> str | None:
         if any(s in low for s in sigs):
             return name
     return None
+
+
+def infer_site_intel(
+    *,
+    low_html: str,
+    external_script_count: int,
+    html_char_count: int,
+    internal_link_count: int,
+    builder: str | None,
+) -> dict[str, Any]:
+    """
+    Classify the first-page HTML as brochure-like (easy refit) vs app-like (heavy client JS).
+    Used for ranking and autopilot queues — heuristics only, not ground truth.
+    """
+    hits = sum(1 for m in _SPA_FRAMEWORK_MARKERS if m in low_html)
+    spa_risk = min(
+        100.0,
+        float(hits * 18 + max(0, external_script_count - 8) * 2.2),
+    )
+    if external_script_count >= 22:
+        spa_risk = min(100.0, spa_risk + 12.0)
+
+    brochure_boost = 0.0
+    b = (builder or "").lower()
+    if any(x in b for x in ("wix", "squarespace", "weebly", "jimdo", "godaddy", "duda")):
+        brochure_boost += 28.0
+    if internal_link_count >= 6 and html_char_count >= 3500:
+        brochure_boost += 12.0
+    if external_script_count <= 9:
+        brochure_boost += 14.0
+
+    static_affinity = max(0.0, min(100.0, 46.0 + brochure_boost - spa_risk * 0.55))
+
+    # One strong framework marker (e.g. Next payload) is enough to treat as app shell.
+    if spa_risk >= 58 or hits >= 2 or (hits >= 1 and spa_risk >= 14):
+        archetype = "app_like"
+    elif static_affinity >= 58 and spa_risk < 38:
+        archetype = "brochure_static"
+    else:
+        archetype = "mixed"
+
+    return {
+        "archetype": archetype,
+        "static_affinity": round(static_affinity, 1),
+        "spa_risk": round(spa_risk, 1),
+        "spa_marker_hits": hits,
+    }
 
 
 def extract_text_and_features(html: str, page_url: str | None = None) -> dict[str, Any]:
@@ -146,8 +216,17 @@ def extract_text_and_features(html: str, page_url: str | None = None) -> dict[st
 
     has_blog = "/blog" in low_html or "blog" in raw_text[:2000]
 
+    builder = detect_builder(html)
+    site_intel = infer_site_intel(
+        low_html=low_html,
+        external_script_count=external_script_count,
+        html_char_count=html_char_count,
+        internal_link_count=internal_link_count,
+        builder=builder,
+    )
+
     return {
-        "builder": detect_builder(html),
+        "builder": builder,
         "has_online_ordering": has_ordering,
         "has_booking": has_booking,
         "has_ecommerce": ecommerce,
@@ -161,6 +240,7 @@ def extract_text_and_features(html: str, page_url: str | None = None) -> dict[st
         "external_script_count": external_script_count,
         "has_viewport_meta": has_viewport_meta,
         "internal_link_count": internal_link_count,
+        "site_intel": site_intel,
     }
 
 
